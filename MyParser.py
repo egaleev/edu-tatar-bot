@@ -52,6 +52,7 @@ def check_user(login, password):
     }
     response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
     if 'err_text' in response.text:
+        print(response.text)
         return False
     else:
         return response.cookies['DNSID']
