@@ -3,6 +3,9 @@ from db import create_session, Users
 import requests
 from bs4 import BeautifulSoup
 
+http = 'http://85.26.146.169:80'
+proxyDict = {"http": http}
+
 
 def check_cookie(cookie):
     url = 'https://edu.tatar.ru/user/diary/week'
@@ -21,7 +24,7 @@ def check_cookie(cookie):
         'Referer': 'https://edu.tatar.ru/logon',
         'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
     }
-    response = requests.request("GET", url, headers=headers, allow_redirects=True)
+    response = requests.request("GET", url, headers=headers, allow_redirects=True, proxies=proxyDict)
     try:
         a = response.history[1].url
         return True
@@ -47,7 +50,7 @@ def check_user(login, password):
         'Referer': 'https://edu.tatar.ru/logon',
         'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
     }
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
     if 'err_text' in response.text:
         return False
     else:
@@ -73,7 +76,7 @@ def get_name(login, password):
         'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
     }
     try:
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
     except:
         return 'error'
     if 'Неверный логин или пароль.' in response.text:
@@ -95,7 +98,7 @@ def get_name(login, password):
         'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
         'Cookie': f'DNSID={session}'
     }
-    res2 = requests.request('GET', f"https://edu.tatar.ru/user/anketa", headers=headers)
+    res2 = requests.request('GET', f"https://edu.tatar.ru/user/anketa", headers=headers, proxies=proxyDict)
     soup = BeautifulSoup(res2.text, 'lxml')
     list = soup.find_all('table')
     ans = []
@@ -128,7 +131,8 @@ def day_info(login, password, day, cookie):
             'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
             'Cookie': f'DNSID={session}'
         }
-        res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/day?for={day}", headers=headers)
+        res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/day?for={day}", headers=headers,
+                                proxies=proxyDict)
         if 'Расписание не найдено' in res2.text:
             return "нет"
         soup = BeautifulSoup(res2.text, 'lxml')
@@ -180,7 +184,7 @@ def day_info(login, password, day, cookie):
             'Referer': 'https://edu.tatar.ru/logon',
             'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
         }
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
         session = create_session()
         user = session.query(Users).filter(Users.login == login).first()
         session = response.cookies['DNSID']
@@ -203,7 +207,8 @@ def day_info(login, password, day, cookie):
             'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
             'Cookie': f'DNSID={session}'
         }
-        res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/day?for={day}", headers=headers)
+        res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/day?for={day}", headers=headers,
+                                proxies=proxyDict)
         if 'Расписание не найдено' in res2.text:
             return "нет"
         soup = BeautifulSoup(res2.text, 'lxml')
