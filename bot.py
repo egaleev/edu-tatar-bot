@@ -7,22 +7,26 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.utils.executor import start_polling
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
-    InlineKeyboardMarkup, InlineKeyboardButton
+    InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
 from db import global_init, Users, create_session
 import MyParser
-from MyParser import check_user, day_info
+from MyParser import check_user, day_info, table
 import json
 
-TOKEN = '1639033609:AAGav07zaQ8DobbJq-t7RYCFdnYLTKJUGiw'
+TOKEN = '1605643472:AAGU6XrjOykQTe_N5PHKR3ulGHSOhOYp73Q'
 
 close = InlineKeyboardButton('❌ Закрыть', callback_data='close')
 back = InlineKeyboardButton('◀ Вернуться в главное меню', callback_data='menu')
+inline_btn_1 = InlineKeyboardButton('👨‍🎓 Перейти в профиль', callback_data='profile')
+inline_btn_2 = InlineKeyboardButton('📔 Расписание на сегодня', callback_data='for_2day')
+inline_btn_3 = InlineKeyboardButton('🏫 Расписание на всю неделю', callback_data='week')
+main_menu = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_2, inline_btn_3, close)
 
 
 def get_dayly(json_table):
     ans = ''
     if 'нет' == json_table:
-        return 'Данный аккаунт является не действитыльным'
+        return 'Данный аккаунт является не действительным'
     counter = 1
     for i in json_table["lessons"]:
         if i["homework"] == '' and i['marks'] == '':
@@ -38,10 +42,6 @@ def get_dayly(json_table):
     return ans
 
 
-def get_weekly(day):
-    return
-
-
 class Login(StatesGroup):
     login = State()
     passw = State()
@@ -51,11 +51,82 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
 
+@dp.callback_query_handler(
+    lambda callback_query: callback_query.data and callback_query.data.startswith('table_lesson'))
+async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
+    await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
+                                     text=f"Загружаем оценки по предмету 📲")
+    session = create_session()
+    user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
+    marks = table(user.login, user.password, user.cookie, '2')
+    lessons = marks['lessons'][int(callback_query.data.split('_')[2])]
+    lesson_name = lessons['lesson_name']
+    marks = lessons['marks']
+    if len(marks) == 0:
+        answer = f'Урок: {lesson_name}\nОценки: Оценок нет! 🙉'
+    else:
+        if '.' in marks[-1]:
+            all_marks = ', '.join(marks[:-1])
+            middle = marks[-1]
+            final = ''
+        else:
+            all_marks = ' '.join(marks[:-2])
+            middle = marks[-2]
+            final = f"Итоговая оценка: {marks[-1]}"
+        answer = f'Урок: {lesson_name}\nВсе оценки: {all_marks}\nСредний бал: {middle}\n{final}'
+    back = InlineKeyboardButton('◀ Назад', callback_data='profile_table')
+    inline_kb1 = InlineKeyboardMarkup(row_width=1).add(back, close)
+    await bot.edit_message_text(answer,
+                                callback_query.message.chat.id,
+                                callback_query.message.message_id, reply_markup=inline_kb1)
+
+
+@dp.callback_query_handler(lambda callback_query: callback_query.data and callback_query.data.startswith('profile_'))
+async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
+    session = create_session()
+    user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
+    if callback_query.data == 'profile_logout':
+        await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
+                                         text="Выходим из аккаунта 👣")
+        await bot.delete_message(callback_query.message.chat.id, callback_query.message.message_id)
+        session.delete(user)
+        session.commit()
+        await bot.send_message(callback_query.message.chat.id,
+                               "Привет!\nДля продолжения необходимо указать логин и пароль\nВ следущем сообщении введите мне только логин.")
+        await Login.login.set()
+    elif callback_query.data == 'profile_table':
+        await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
+                                         text="Открываем список предметов 📖")
+        inline_kb1 = InlineKeyboardMarkup(row_width=2)
+        marks = table(user.login, user.password, user.cookie, '2')
+        counter = 0
+        last_button = None
+        for i in marks['lessons']:
+            inline_btn_1 = InlineKeyboardButton(f'{i["lesson_name"]}', callback_data=f'table_lesson_{counter}')
+            if counter % 2 != 0:
+                inline_kb1.row(last_button, inline_btn_1)
+            counter += 1
+            last_button = inline_btn_1
+        back = InlineKeyboardButton('◀ Назад', callback_data='profile')
+        inline_kb1.row(back)
+        inline_kb1.row(close)
+        await bot.edit_message_text('Выберете предмет у которого вы хотите узнать оценки ⬇️',
+                                    callback_query.message.chat.id,
+                                    callback_query.message.message_id, reply_markup=inline_kb1)
+
+
 @dp.callback_query_handler(lambda callback_query: callback_query.data and callback_query.data.startswith('profile'))
 async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(
-        callback_query.id,
-        text='Не работает', show_alert=True)
+    await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
+                                     text="Открываем профиль 👨‍🎓")
+    inline_btn_1 = InlineKeyboardButton('👩‍🏫 Табель успеваемости', callback_data='profile_table')
+    inline_btn_3 = types.InlineKeyboardButton(text='ℹ️ Помощь', url="t.me/stripessssssssssssssssssssssssss")
+    inline_btn_2 = InlineKeyboardButton('📵 Выйти ', callback_data='profile_logout')
+    inline_kb1 = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_3, inline_btn_2)
+    inline_kb1.row(back, close)
+    await bot.edit_message_text('Выберете действие ⬇️',
+                                callback_query.message.chat.id,
+                                callback_query.message.message_id, reply_markup=inline_kb1)
 
 
 @dp.callback_query_handler(lambda callback_query: callback_query.data and callback_query.data.startswith('week_'))
@@ -64,6 +135,7 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
     today = str(datetime.datetime.now().weekday())
     session = create_session()
     user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
+    back = InlineKeyboardButton('◀ Назад', callback_data='week')
     if day == today:
         now = datetime.datetime.now()
         s = f"{now.day}/{now.month}/{now.year}"
@@ -128,15 +200,11 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
     elif callback_query.data == 'menu':
         session = create_session()
         user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
-        inline_btn_1 = InlineKeyboardButton('👨‍🎓 Перейти в профиль', callback_data='profile')
-        inline_btn_2 = InlineKeyboardButton('📔 Посмотреть расписание на сегодня', callback_data='for_2day')
-        inline_btn_3 = InlineKeyboardButton('🏫 Посмотреть расписание на всю неделю', callback_data='week')
-        inline_kb1 = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_2, inline_btn_3, close)
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
-                                         text="Возвращаемся в главное меню ⬅️")
+                                         text="Возвращаемся в главное меню ⬅")
         await bot.edit_message_text(f"Здравствуйте, {user.name}!",
                                     callback_query.message.chat.id, callback_query.message.message_id,
-                                    reply_markup=inline_kb1)
+                                    reply_markup=main_menu)
 
     else:
         await bot.delete_message(callback_query.message.chat.id, callback_query.message.message_id)
@@ -147,19 +215,17 @@ async def process_start_command(message: types.Message):
     session = create_session()
     user = session.query(Users).filter(Users.tg_id == message.chat.id).first()
     if user != None:
-        inline_btn_1 = InlineKeyboardButton('👨‍🎓 Перейти в профиль', callback_data='profile')
-        inline_btn_2 = InlineKeyboardButton('📔 Посмотреть расписание на сегодня', callback_data='for_2day')
-        inline_btn_3 = InlineKeyboardButton('🏫 Посмотреть расписание на всю неделю', callback_data='week')
-        inline_kb1 = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_2, inline_btn_3, close)
-        await message.reply(f"Здравствуйте, {user.name}", reply_markup=inline_kb1)
+        await message.reply(f"Здравствуйте, {user.name} ✌️", reply_markup=main_menu)
     else:
-        await message.reply("Привет!\nДля продолжения необходимо указать логин и пароль")
+        await message.reply(
+            "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только пароль.*",
+            parse_mode=ParseMode.MARKDOWN)
         await Login.login.set()
 
 
 @dp.message_handler()
 async def getting_password(msg: types.Message):
-    await msg.reply('Я не совсем понимаю что вы имеете ввиду\n Попробуйте нажать /start')
+    await msg.reply('Я не понимаю вас ☹️\nПопробуйте нажать /start')
 
 
 @dp.message_handler(state=Login.login)
@@ -181,6 +247,9 @@ async def getting_password(msg: types.Message, state: FSMContext):
                                 text='Проверяем введеные данные...')
     a = check_user(login, password)
     if a:
+        await bot.send_message(msg.chat.id,
+                               'Добро пожаловать! Обратите внимание, что данный бот все еще находится в разработке и, скорее всего, имеет некоторые баги, но вместе с вами мы сможем их устранить! Если вы заметили какую-либо ошибку, '
+                               'обратитесь в поддержку. Мы постараемся решить ваш вопрос как можно скорее. Удачного пользования 😉')
         session = create_session()
         new = Users()
         new.password = password
@@ -190,15 +259,11 @@ async def getting_password(msg: types.Message, state: FSMContext):
         new.cookie = a
         session.add(new)
         session.commit()
-        inline_btn_1 = InlineKeyboardButton('👨‍🎓 Перейти в профиль', callback_data='button1')
-        inline_btn_2 = InlineKeyboardButton('📔 Посмотреть расписание на сегодня', callback_data='for_2day')
-        inline_btn_3 = InlineKeyboardButton('🏫 Посмотреть расписание на всю неделю', callback_data='week')
-        inline_kb1 = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_2, inline_btn_3, close)
-        await bot.edit_message_text(text=f"Здравствуйте, {new.name}!", message_id=da.message_id, chat_id=msg.chat.id,
-                                    reply_markup=inline_kb1)
+        await bot.edit_message_text(text=f"Привет, {new.name}!", message_id=da.message_id, chat_id=msg.chat.id,
+                                    reply_markup=main_menu)
     else:
         await bot.edit_message_text(chat_id=msg.chat.id, message_id=da.message_id,
-                                    text='Видимо вы вели неверные данные(\nПопробуйте еще раз')
+                                    text='Видимо вы вели неверные данные 😔\nПопробуйте еще раз')
 
 
 if __name__ == '__main__':
