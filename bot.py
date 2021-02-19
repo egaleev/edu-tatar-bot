@@ -93,7 +93,7 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
         session.commit()
         await bot.send_message(callback_query.message.chat.id,
                                "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только логин.*",
-            parse_mode=ParseMode.MARKDOWN))
+            parse_mode=ParseMode.MARKDOWN)
         await Login.login.set()
     elif callback_query.data == 'profile_table':
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
