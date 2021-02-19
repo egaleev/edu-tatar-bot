@@ -92,7 +92,8 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
         session.delete(user)
         session.commit()
         await bot.send_message(callback_query.message.chat.id,
-                               "Привет!\nДля продолжения необходимо указать логин и пароль\nВ следущем сообщении введите мне только логин.")
+                               "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только логин.*",
+            parse_mode=ParseMode.MARKDOWN))
         await Login.login.set()
     elif callback_query.data == 'profile_table':
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
@@ -218,7 +219,7 @@ async def process_start_command(message: types.Message):
         await message.reply(f"Здравствуйте, {user.name} ✌️", reply_markup=main_menu)
     else:
         await message.reply(
-            "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только пароль.*",
+            "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только логин.*",
             parse_mode=ParseMode.MARKDOWN)
         await Login.login.set()
 
@@ -233,7 +234,7 @@ async def getting_password(msg: types.Message, state: FSMContext):
     login = msg.text
     async with state.proxy() as data:
         data['user_login'] = login
-    await bot.send_message(msg.chat.id, 'Отлично, осталось ввести пароль')
+    await bot.send_message(msg.chat.id, 'Отлично 😉, осталось ввести пароль')
     await Login.passw.set()
 
 
