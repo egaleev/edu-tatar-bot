@@ -6,24 +6,26 @@ from bs4 import BeautifulSoup
 http = 'http://85.26.146.169:80'
 proxyDict = {"http": http}
 
+headers1 = {
+    'Connection': 'keep-alive',
+    'Cache-Control': 'max-age=0',
+    'Upgrade-Insecure-Requests': '1',
+    'Origin': 'https://edu.tatar.ru',
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-User': '?1',
+    'Sec-Fetch-Dest': 'document',
+    'Referer': 'https://edu.tatar.ru/logon',
+    'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
+}
+
 
 def check_cookie(cookie):
     url = 'https://edu.tatar.ru/user/diary/week'
-    headers = {
-        'Connection': 'keep-alive',
-        'Cache-Control': 'max-age=0',
-        'Upgrade-Insecure-Requests': '1',
-        'Origin': 'https://edu.tatar.ru',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-User': '?1',
-        'Sec-Fetch-Dest': 'document',
-        'Referer': 'https://edu.tatar.ru/logon',
-        'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
-    }
+    headers = headers1
     response = requests.request("GET", url, headers=headers, allow_redirects=True, proxies=proxyDict)
     try:
         a = response.history[1].url
@@ -35,24 +37,9 @@ def check_cookie(cookie):
 def check_user(login, password):
     url = "https://edu.tatar.ru/logon"
     payload = f'main_login={login}&main_password={password}'
-    headers = {
-        'Connection': 'keep-alive',
-        'Cache-Control': 'max-age=0',
-        'Upgrade-Insecure-Requests': '1',
-        'Origin': 'https://edu.tatar.ru',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-User': '?1',
-        'Sec-Fetch-Dest': 'document',
-        'Referer': 'https://edu.tatar.ru/logon',
-        'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
-    }
+    headers = headers1
     response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
     if 'err_text' in response.text:
-        requests.request("GET", "https://moy-magnit.herokuapp.com/", proxies=proxyDict)
         return False
     else:
         return response.cookies['DNSID']
@@ -61,21 +48,7 @@ def check_user(login, password):
 def get_name(login, password):
     url = "https://edu.tatar.ru/logon"
     payload = f'main_login={login}&main_password={password}'
-    headers = {
-        'Connection': 'keep-alive',
-        'Cache-Control': 'max-age=0',
-        'Upgrade-Insecure-Requests': '1',
-        'Origin': 'https://edu.tatar.ru',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-User': '?1',
-        'Sec-Fetch-Dest': 'document',
-        'Referer': 'https://edu.tatar.ru/logon',
-        'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
-    }
+    headers = headers1
     try:
         response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
     except:
@@ -111,6 +84,85 @@ def get_name(login, password):
         if len(temp) == 1:
             temp.append('null')
         return temp[1]
+
+
+def table(login, password, cookie, period):
+    session = cookie
+    headers = {
+        'Connection': 'keep-alive',
+        'Cache-Control': 'max-age=0',
+        'Upgrade-Insecure-Requests': '1',
+        'Origin': 'https://edu.tatar.ru',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-User': '?1',
+        'Sec-Fetch-Dest': 'document',
+        'Referer': 'https://edu.tatar.ru/logon',
+        'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
+        'Cookie': f'DNSID={session}'
+    }
+    res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/term?term={period}", headers=headers)
+    soup = BeautifulSoup(res2.text, 'lxml')
+    list = soup.find_all('tr')
+    marks = []
+    for i in range(1, len(list) - 1):
+        temp = []
+        for j in list[i].text.split("\n"):
+            if j != '' and j != 'просмотр':
+                temp.append(j.lstrip())
+        ans = {}
+        ans['lesson_name'] = temp[0]
+        ans['marks'] = temp[1:]
+        marks.append(ans)
+    json_marks = {}
+    json_marks["lessons"] = marks
+    if len(json_marks['lessons']) != 0:
+        return json_marks
+    else:
+        url = "https://edu.tatar.ru/logon"
+        payload = f'main_login={login}&main_password={password}'
+        response = requests.request("POST", url, headers=headers1, data=payload, proxies=proxyDict)
+        db_session = create_session()
+        user = db_session.query(Users).filter(Users.login == login).first()
+        session = response.cookies['DNSID']
+        user.cookie = session
+        db_session.add(user)
+        db_session.commit()
+        headers = {
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Origin': 'https://edu.tatar.ru',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-User': '?1',
+            'Sec-Fetch-Dest': 'document',
+            'Referer': 'https://edu.tatar.ru/logon',
+            'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
+            'Cookie': f'DNSID={session}'
+        }
+        res2 = requests.request('GET', f"https://edu.tatar.ru/user/diary/term?term={period}", headers=headers)
+        soup = BeautifulSoup(res2.text, 'lxml')
+        list = soup.find_all('tr')
+        marks = []
+        for i in range(1, len(list) - 1):
+            temp = []
+            for j in list[i].text.split("\n"):
+                if j != '' and j != 'просмотр':
+                    temp.append(j.lstrip())
+            ans = {}
+            ans['lesson_name'] = temp[0]
+            ans['marks'] = temp[1:]
+            marks.append(ans)
+        json_marks = {}
+        json_marks["lessons"] = marks
+        return json_marks
 
 
 def day_info(login, password, day, cookie):
@@ -166,32 +218,19 @@ def day_info(login, password, day, cookie):
             s["marks"] = marks
             a.append(s)
         json_ans["lessons"] = a
+        if (len(json_ans["lessons"]) == 0):
+            a = 1 / 0
         return json_ans
     except:
         url = "https://edu.tatar.ru/logon"
         payload = f'main_login={login}&main_password={password}'
-        headers = {
-            'Connection': 'keep-alive',
-            'Cache-Control': 'max-age=0',
-            'Upgrade-Insecure-Requests': '1',
-            'Origin': 'https://edu.tatar.ru',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.66 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'Sec-Fetch-Site': 'same-origin',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-User': '?1',
-            'Sec-Fetch-Dest': 'document',
-            'Referer': 'https://edu.tatar.ru/logon',
-            'Accept-Language': 'en-GB,en;q=0.9,ru-RU;q=0.8,ru;q=0.7,en-US;q=0.6',
-        }
-        response = requests.request("POST", url, headers=headers, data=payload, proxies=proxyDict)
-        session = create_session()
-        user = session.query(Users).filter(Users.login == login).first()
+        response = requests.request("POST", url, headers=headers1, data=payload, proxies=proxyDict)
+        db_session = create_session()
+        user = db_session.query(Users).filter(Users.login == login).first()
         session = response.cookies['DNSID']
         user.cookie = session
-        session.add(user)
-        session.commit()
+        db_session.add(user)
+        db_session.commit()
         headers = {
             'Connection': 'keep-alive',
             'Cache-Control': 'max-age=0',
