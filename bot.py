@@ -1,3 +1,4 @@
+import asyncio
 import time
 import datetime
 from aiogram import Bot, types
@@ -8,10 +9,11 @@ from aiogram.utils.executor import start_polling
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
     InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
-from db import global_init, Users, create_session
+from db import global_init, Users, create_session, Lessons
 import MyParser
 from MyParser import check_user, day_info, table
 import json
+import aioschedule
 
 TOKEN = '1605643472:AAGU6XrjOykQTe_N5PHKR3ulGHSOhOYp73Q'
 
@@ -28,17 +30,21 @@ def get_dayly(json_table):
     if 'нет' == json_table:
         return 'Данный аккаунт является не действительным'
     counter = 1
-    for i in json_table["lessons"]:
-        if i["homework"] == '' and i['marks'] == '':
-            ans += f"{counter}. {i['lesson_time'].split('—')[0]} — {i['lesson_name']}\n"
-        elif i["homework"] == '':
-            ans += f"{counter}. {i['lesson_time'].split('—')[0]} — {i['lesson_name']}, Оценки: {i['marks']}\n"
-        elif i["marks"] == '':
-            ans += f"{counter}. {i['lesson_time'].split('—')[0]} — {i['lesson_name']}, ДЗ: {i['homework']}\n"
-        else:
-            ans += f"{counter}. {i['lesson_time'].split('—')[0]} — {i['lesson_name']}, ДЗ: {i['homework']}, Оценки: {i['marks']}\n"
-        ans += '\n'
-        counter += 1
+
+    if len(json_table['lessons']) == 0:
+        ans = 'На сегодня уроков нет!'
+    else:
+        for i in json_table["lessons"]:
+            if i["homework"] == '' and i['marks'] == '':
+                ans += f"{counter}){i['lesson_time'].split('—')[0]} — *{i['lesson_name']}*\n"
+            elif i["homework"] == '':
+                ans += f"{counter}){i['lesson_time'].split('—')[0]} — *{i['lesson_name']}* \n   Оценки 👉🏻 :{i['marks']}\n"
+            elif i["marks"] == '':
+                ans += f"{counter}){i['lesson_time'].split('—')[0]} — *{i['lesson_name']}* \n   ДЗ 📖 :{i['homework']}\n"
+            else:
+                ans += f"{counter}){i['lesson_time'].split('—')[0]} — *{i['lesson_name']}* \n   ДЗ 📖 :{i['homework']} \n   Оценки 👉🏻 :{i['marks']}\n"
+            ans += '\n'
+            counter += 1
     return ans
 
 
@@ -52,13 +58,40 @@ dp = Dispatcher(bot, storage=MemoryStorage())
 
 
 @dp.callback_query_handler(
+    lambda callback_query: callback_query.data and callback_query.data.startswith('profile_table_'))
+async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
+    session = create_session()
+    user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
+    period = callback_query.data.split('_')[-1]
+    await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
+                                     text="Открываем список предметов 📖")
+    inline_kb1 = InlineKeyboardMarkup(row_width=2)
+    marks = table(user.login, user.password, user.cookie, period)
+    counter = 0
+    last_button = None
+    for i in marks['lessons']:
+        inline_btn_1 = InlineKeyboardButton(f'{i["lesson_name"]}', callback_data=f'table_lesson_{counter}_{period}')
+        if counter % 2 != 0:
+            inline_kb1.row(last_button, inline_btn_1)
+        counter += 1
+        last_button = inline_btn_1
+    back = InlineKeyboardButton('◀ Назад', callback_data='profile_table')
+    inline_kb1.row(back)
+    inline_kb1.row(close)
+    await bot.edit_message_text('Выберете предмет у которого вы хотите узнать оценки ⬇️',
+                                callback_query.message.chat.id,
+                                callback_query.message.message_id, reply_markup=inline_kb1)
+
+
+@dp.callback_query_handler(
     lambda callback_query: callback_query.data and callback_query.data.startswith('table_lesson'))
 async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
     await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
                                      text=f"Загружаем оценки по предмету 📲")
+    period = callback_query.data.split('_')[-1]
     session = create_session()
     user = session.query(Users).filter(Users.tg_id == callback_query.message.chat.id).first()
-    marks = table(user.login, user.password, user.cookie, '2')
+    marks = table(user.login, user.password, user.cookie, period)
     lessons = marks['lessons'][int(callback_query.data.split('_')[2])]
     lesson_name = lessons['lesson_name']
     marks = lessons['marks']
@@ -74,7 +107,7 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
             middle = marks[-2]
             final = f"Итоговая оценка: {marks[-1]}"
         answer = f'Урок: {lesson_name}\nВсе оценки: {all_marks}\nСредний бал: {middle}\n{final}'
-    back = InlineKeyboardButton('◀ Назад', callback_data='profile_table')
+    back = InlineKeyboardButton('◀ Назад', callback_data=f'profile_table_{period}')
     inline_kb1 = InlineKeyboardMarkup(row_width=1).add(back, close)
     await bot.edit_message_text(answer,
                                 callback_query.message.chat.id,
@@ -89,29 +122,24 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
                                          text="Выходим из аккаунта 👣")
         await bot.delete_message(callback_query.message.chat.id, callback_query.message.message_id)
+        lessons = session.query(Lessons).filter(Lessons.owner_tg_id == callback_query.message.chat.id).all()
+        for lesson in lessons:
+            session.delete(lesson)
         session.delete(user)
         session.commit()
         await bot.send_message(callback_query.message.chat.id,
                                "Привет! 👋\nДля продолжения необходимо указать свои данные\nВ следущем сообщении введите *только логин.*",
-            parse_mode=ParseMode.MARKDOWN)
+                               parse_mode=ParseMode.MARKDOWN)
         await Login.login.set()
     elif callback_query.data == 'profile_table':
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
-                                         text="Открываем список предметов 📖")
-        inline_kb1 = InlineKeyboardMarkup(row_width=2)
-        marks = table(user.login, user.password, user.cookie, '2')
-        counter = 0
-        last_button = None
-        for i in marks['lessons']:
-            inline_btn_1 = InlineKeyboardButton(f'{i["lesson_name"]}', callback_data=f'table_lesson_{counter}')
-            if counter % 2 != 0:
-                inline_kb1.row(last_button, inline_btn_1)
-            counter += 1
-            last_button = inline_btn_1
+                                         text=f"Выберете {user.period_name}")
+        inline_kb1 = InlineKeyboardMarkup(row_width=1)
+        for i in range(user.period_amount):
+            inline_kb1.row(InlineKeyboardButton(f'{i + 1} {user.period_name}', callback_data=f'profile_table_{i + 1}'))
         back = InlineKeyboardButton('◀ Назад', callback_data='profile')
-        inline_kb1.row(back)
-        inline_kb1.row(close)
-        await bot.edit_message_text('Выберете предмет у которого вы хотите узнать оценки ⬇️',
+        inline_kb1.row(back, close)
+        await bot.edit_message_text(f"Выберете {user.period_name}",
                                     callback_query.message.chat.id,
                                     callback_query.message.message_id, reply_markup=inline_kb1)
 
@@ -146,7 +174,8 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
                                          text="Получаем расписание на сегодня 🔍")
         await bot.edit_message_text(get_dayly(day_info(user.login, user.password, unix_day, user.cookie)),
                                     callback_query.message.chat.id,
-                                    callback_query.message.message_id, reply_markup=inline_kb1)
+                                    callback_query.message.message_id, reply_markup=inline_kb1,
+                                    parse_mode=ParseMode.MARKDOWN)
     elif day > today:
         now = datetime.datetime.now()
         s = f"{now.day + abs(int(day) - int(today))}/{now.month}/{now.year}"
@@ -156,7 +185,8 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
                                          text="Получаем расписание на выбранный вами день 👀")
         await bot.edit_message_text(get_dayly(day_info(user.login, user.password, unix_day, user.cookie)),
                                     callback_query.message.chat.id,
-                                    callback_query.message.message_id, reply_markup=inline_kb1)
+                                    callback_query.message.message_id, reply_markup=inline_kb1,
+                                    parse_mode=ParseMode.MARKDOWN)
     else:
         now = datetime.datetime.now()
         s = f"{now.day - abs(int(today) - int(day))}/{now.month}/{now.year}"
@@ -166,7 +196,8 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
                                          text="Получаем расписание на выбранный вами день 👀")
         await bot.edit_message_text(get_dayly(day_info(user.login, user.password, unix_day, user.cookie)),
                                     callback_query.message.chat.id,
-                                    callback_query.message.message_id, reply_markup=inline_kb1)
+                                    callback_query.message.message_id, reply_markup=inline_kb1,
+                                    parse_mode=ParseMode.MARKDOWN)
 
 
 @dp.callback_query_handler()
@@ -182,7 +213,8 @@ async def process_callback_kb1btn1(callback_query: types.CallbackQuery):
                                          text="Получаем расписание на сегодня 🔍")
         await bot.edit_message_text(get_dayly(day_info(user.login, user.password, unix_day, user.cookie)),
                                     callback_query.message.chat.id,
-                                    callback_query.message.message_id, reply_markup=inline_kb1)
+                                    callback_query.message.message_id, reply_markup=inline_kb1,
+                                    parse_mode=ParseMode.MARKDOWN)
     elif callback_query.data == 'week':
         await  bot.answer_callback_query(callback_query_id=callback_query.id, show_alert=False,
                                          text="Осталось выбрать день недели 📆")
@@ -234,7 +266,7 @@ async def getting_password(msg: types.Message, state: FSMContext):
     login = msg.text
     async with state.proxy() as data:
         data['user_login'] = login
-    await bot.send_message(msg.chat.id, 'Отлично 😉, осталось ввести пароль')
+    await bot.send_message(msg.chat.id, 'Отлично, осталось ввести пароль')
     await Login.passw.set()
 
 
@@ -248,25 +280,74 @@ async def getting_password(msg: types.Message, state: FSMContext):
                                 text='Проверяем введеные данные...')
     a = check_user(login, password)
     if a:
-        await bot.send_message(msg.chat.id,
-                               'Добро пожаловать! Обратите внимание, что данный бот все еще находится в разработке и, скорее всего, имеет некоторые баги, но вместе с вами мы сможем их устранить! Если вы заметили какую-либо ошибку, '
-                               'обратитесь в поддержку. Мы постараемся решить ваш вопрос как можно скорее. Удачного пользования 😉')
+        await bot.edit_message_text(chat_id=msg.chat.id, message_id=da.message_id,
+                                    text='Получаем информацию о вас...')
+        info = MyParser.period_info(a)
+        period_name = info['name']
+        amount = info['amount']
         session = create_session()
         new = Users()
         new.password = password
         new.login = login
         new.tg_id = msg.chat.id
+        new.period_name = period_name
+        new.period_amount = amount
         new.name = MyParser.get_name(login, password)
         new.cookie = a
         session.add(new)
         session.commit()
-        await bot.edit_message_text(text=f"Привет, {new.name}!", message_id=da.message_id, chat_id=msg.chat.id,
-                                    reply_markup=main_menu)
+        marks = table(login, password, a, amount)
+        for current_lesson in marks['lessons']:
+            lesson = Lessons()
+            temp_marks = current_lesson['marks']
+            lesson.lesson_name = current_lesson['lesson_name']
+            if len(temp_marks) == 0:
+                middle = ''
+                final = ''
+                marks = ''
+            else:
+                if '.' in temp_marks[-2]:
+                    middle = temp_marks[-2]
+                    final = temp_marks[-1]
+                    marks = ''.join(temp_marks[1:-2])
+                else:
+                    middle = temp_marks[-1]
+                    marks = ''.join(temp_marks[1:-1])
+                    final = ''
+            lesson.middle = middle
+            lesson.final = final
+            lesson.marks = marks
+            lesson.owner_tg_id = msg.chat.id
+            session.add(lesson)
+            session.commit()
+        await bot.edit_message_text(chat_id=msg.chat.id, message_id=da.message_id, text=
+        'Добро пожаловать! Обратите внимание, что данный бот все еще находится в разработке и, скорее всего, имеет некоторые баги, но вместе с вами мы сможем их устранить! Если вы заметили какую-либо ошибку, '
+        'обратитесь в поддержку. Мы постараемся решить ваш вопрос как можно скорее. Удачного пользования 😉')
+        await bot.send_message(text=f"Здравствуйте, {new.name}! ✌️", chat_id=msg.chat.id,
+                               reply_markup=main_menu)
     else:
         await bot.edit_message_text(chat_id=msg.chat.id, message_id=da.message_id,
                                     text='Видимо вы вели неверные данные 😔\nПопробуйте еще раз')
 
 
+async def scheduler():
+    aioschedule.every(1).seconds.do(check_new)
+    while True:
+        await aioschedule.run_pending()
+        await asyncio.sleep(1)
+
+
+async def check_new():
+    ans = MyParser.get_new()
+    for i in ans:
+        if len(i) > 1:
+            await bot.send_message(i[0], i[1], parse_mode=ParseMode.MARKDOWN)
+
+
+async def on_startup(x):
+    asyncio.create_task(scheduler())
+
+
 if __name__ == '__main__':
     global_init("db.sqlite")
-    start_polling(dp)
+    start_polling(dp, on_startup=on_startup)
