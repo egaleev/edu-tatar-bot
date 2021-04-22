@@ -39,4 +39,17 @@ class Users(SqlAlchemyBase):
     login = sqlalchemy.Column(sqlalchemy.String)
     password = sqlalchemy.Column(sqlalchemy.String)
     name = sqlalchemy.Column(sqlalchemy.String)
+    period_name = sqlalchemy.Column(sqlalchemy.String)
+    period_amount = sqlalchemy.Column(sqlalchemy.Integer)
     cookie = sqlalchemy.Column(sqlalchemy.String)
+
+
+class Lessons(SqlAlchemyBase):
+    __tablename__ = 'lessons'
+    lesson_id = sqlalchemy.Column(sqlalchemy.Integer, autoincrement=True, primary_key=True)
+    owner_tg_id = sqlalchemy.Column(sqlalchemy.String)
+    lesson_name = sqlalchemy.Column(sqlalchemy.String)
+    middle = sqlalchemy.Column(sqlalchemy.String)
+    final = sqlalchemy.Column(sqlalchemy.String)
+    marks = sqlalchemy.Column(sqlalchemy.String)
+
