@@ -331,7 +331,7 @@ async def getting_password(msg: types.Message, state: FSMContext):
 
 
 async def scheduler():
-    aioschedule.every(1).seconds.do(check_new)
+    aioschedule.every(600).seconds.do(check_new)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
