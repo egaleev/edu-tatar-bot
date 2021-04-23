@@ -350,4 +350,4 @@ async def on_startup(x):
 
 if __name__ == '__main__':
     global_init("db.sqlite")
-    start_polling(dp)
+    start_polling(dp, on_startup=on_startup)
