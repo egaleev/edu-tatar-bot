@@ -27,7 +27,7 @@ main_menu = InlineKeyboardMarkup(row_width=1).add(inline_btn_1, inline_btn_2, in
 
 def get_dayly(json_table):
     ans = ''
-    if 'нет' == json_table:
+    if 'inactive' == json_table:
         return 'Данный аккаунт является не действительным'
     counter = 1
 
